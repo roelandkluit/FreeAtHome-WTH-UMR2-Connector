@@ -1,0 +1,46 @@
+{
+  "name": {
+    "en": "WTH UMR2 Connector for Free@Home"
+  },
+  "version": "0.0.3",
+  "id": "com.wthumr2",
+  "license": "Lgplv3",
+  "description": {
+    "en": "Control the thermostats of a WTH UMR2 trough Free@Home."
+  },
+  "url": {
+	"en": "https://github.com/roelandkluit/"
+  },
+  "author": "Roeland Kluit",
+  "type": "app",
+  "entryPoint": "build/UMR-FreeAtHomeConnector.js",
+  "parameters": {
+    "default": {
+      "name": "Settings",
+      "items": {
+        "UMR": {
+          "name": "UMR Hostname or IP-address",
+          "type": "string"
+        },
+        "TEMP_ECO": {
+          "name": "UMR Eco Temperature Setpoint",
+          "type": "number",
+          "min": 10,
+          "max": 25
+        },
+        "TEMP_OFF": {
+          "name": "UMR Off Temperature Setpoint",
+          "type": "number",
+          "min": 1,
+          "max": 9
+        },
+        "RefreshInt": {
+          "name": "Interval for UMR data sync in Minutes",
+          "type": "number",
+          "min": 1,
+          "max": 30
+        }
+      }
+    }
+  }
+}

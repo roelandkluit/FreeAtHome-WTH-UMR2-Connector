@@ -1,0 +1,25 @@
+{
+	"configurations": [
+		{
+			"type": "node-terminal",
+			"name": "JavaScript Debug Terminal",
+			"request": "launch",
+			"cwd": "${workspaceFolder}"
+		},
+		{
+			"name": "Node.js - Run Test",
+			"type": "node",
+			"request": "launch",
+			"program": "${workspaceFolder}/UMR-FreeAtHomeConnector.ts",
+			"env": {
+				"FREEATHOME_API_USERNAME": "UserIDGuid",
+				"FREEATHOME_API_PASSWORD": "Password",
+				"FREEATHOME_BASE_URL": "http://sysap"
+			},
+			"preLaunchTask": "tsc: build - tsconfig.json",
+			"outFiles": [
+				"${workspaceFolder}/build/**/*.js"
+			]
+		}
+	]
+}

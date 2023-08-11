@@ -1,0 +1,6 @@
+{
+  "dependencies": {
+    "@busch-jaeger/free-at-home": "",
+    "nodejs-wth-umr-connect": ""
+  }
+}
