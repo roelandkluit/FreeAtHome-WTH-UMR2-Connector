@@ -2,6 +2,7 @@ import { FreeAtHome, PairingIds } from "@busch-jaeger/free-at-home";
 import { ScriptingAPI as API } from "@busch-jaeger/free-at-home";
 import { ScriptingHost as Addons } from "@busch-jaeger/free-at-home";
 import { UMRConnect } from "nodejs-wth-umr-connect";
+import {RoomTemperatureControllerChannelExt} from "./RoomTemperatureControllerChannelExt";
 
 let dictThermostats = new Map<number, any>();
 var UMR_URL = "";
@@ -43,10 +44,19 @@ addons.on("configurationChanged", (configuration: UMRConfigurationProperties) =>
   }
 });
 
+//Creating thermostat using custom template, 
+//Pull request https://github.com/Busch-Jaeger/node-free-at-home/pull/4 is not going through, so lib does not have correct datapoints for RTC.
+//Implemented local version of the RTC to overcome incomplete implementation of the RTC in the API.
+async function createRoomTemperatureControllerDeviceExt(FahConnection:any, nativeId: string, name: string): Promise<RoomTemperatureControllerChannelExt> {
+  const device = await FahConnection.freeAtHomeApi.createDevice("RTC", nativeId, name);
+  const channel = device.getChannels().next().value;
+  return new RoomTemperatureControllerChannelExt(channel);
+}
+
 async function CreateNewThermostat(thermostatID:number, InitialSetPoint:number, dict:any, FahConnection:any, UMR:any)
 {
-    //console.log("Creating device" + number);
-    var RTCChannel = await FahConnection.createRoomTemperatureControllerDevice("UMR_RT" + thermostatID, "UMR Thermostat " + thermostatID);
+    console.log("Creating device" + thermostatID);
+    var RTCChannel = await createRoomTemperatureControllerDeviceExt(FahConnection, "UMR_RT" + thermostatID, "UMR Thermostat " + thermostatID);
     RTCChannel.setAutoKeepAlive(true);
     RTCChannel.setAutoConfirm(true);
     RTCChannel.on('onSetPointTemperatureChanged', (value) => {
@@ -81,8 +91,22 @@ async function main()
     freeAtHome.activateSignalHandling();
 
     await addons.connectToConfiguration();
-    await timer(2000);
+    await timer(2000);    
     console.log("FAH initialization completed");
+
+    var count = 0;
+    while(freeAtHome.freeAtHomeApi.getConnectionState() != 1)
+    {
+      count++;
+      console.log("Not connected: " + freeAtHome.freeAtHomeApi.getConnectionState());
+      if(count > 10)
+      {
+        console.error("Failing on connection to FaH");
+        process.exit();
+        return;
+      }
+      await timer(2000);
+    }
 
     var UMR = new UMRConnect();
     freeAtHome.setEnableLogging(true)

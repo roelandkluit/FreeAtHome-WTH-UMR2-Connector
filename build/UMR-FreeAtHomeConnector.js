@@ -39,6 +39,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 var free_at_home_1 = require("@busch-jaeger/free-at-home");
 var free_at_home_2 = require("@busch-jaeger/free-at-home");
 var nodejs_wth_umr_connect_1 = require("nodejs-wth-umr-connect");
+var RoomTemperatureControllerChannelExt_1 = require("./RoomTemperatureControllerChannelExt");
 var dictThermostats = new Map();
 var UMR_URL = "";
 var ECO_T = 0;
@@ -62,12 +63,31 @@ addons.on("configurationChanged", function (configuration) {
         REFRESH_INT = configuration.default.items.RefreshInt;
     }
 });
+//Creating thermostat using custom template, 
+//Pull request https://github.com/Busch-Jaeger/node-free-at-home/pull/4 is not going through, so lib does not have correct datapoints for RTC.
+//Implemented local version of the RTC
+function createRoomTemperatureControllerDeviceExt(FahConnection, nativeId, name) {
+    return __awaiter(this, void 0, void 0, function () {
+        var device, channel;
+        return __generator(this, function (_a) {
+            switch (_a.label) {
+                case 0: return [4 /*yield*/, FahConnection.freeAtHomeApi.createDevice("RTC", nativeId, name)];
+                case 1:
+                    device = _a.sent();
+                    channel = device.getChannels().next().value;
+                    return [2 /*return*/, new RoomTemperatureControllerChannelExt_1.RoomTemperatureControllerChannelExt(channel)];
+            }
+        });
+    });
+}
 function CreateNewThermostat(thermostatID, InitialSetPoint, dict, FahConnection, UMR) {
     return __awaiter(this, void 0, void 0, function () {
         var RTCChannel;
         return __generator(this, function (_a) {
             switch (_a.label) {
-                case 0: return [4 /*yield*/, FahConnection.createRoomTemperatureControllerDevice("UMR_RT" + thermostatID, "UMR Thermostat " + thermostatID)];
+                case 0:
+                    console.log("Creating device" + thermostatID);
+                    return [4 /*yield*/, createRoomTemperatureControllerDeviceExt(FahConnection, "UMR_RT" + thermostatID, "UMR Thermostat " + thermostatID)];
                 case 1:
                     RTCChannel = _a.sent();
                     RTCChannel.setAutoKeepAlive(true);
@@ -101,7 +121,7 @@ function CreateNewThermostat(thermostatID, InitialSetPoint, dict, FahConnection,
 }
 function main() {
     return __awaiter(this, void 0, void 0, function () {
-        var freeAtHome, UMR, t;
+        var freeAtHome, count, UMR, t;
         return __generator(this, function (_a) {
             switch (_a.label) {
                 case 0:
@@ -115,6 +135,22 @@ function main() {
                 case 2:
                     _a.sent();
                     console.log("FAH initialization completed");
+                    count = 0;
+                    _a.label = 3;
+                case 3:
+                    if (!(freeAtHome.freeAtHomeApi.getConnectionState() != 1)) return [3 /*break*/, 5];
+                    count++;
+                    console.log("Not connected: " + freeAtHome.freeAtHomeApi.getConnectionState());
+                    if (count > 10) {
+                        console.error("Failing on connection to FaH");
+                        process.exit();
+                        return [2 /*return*/];
+                    }
+                    return [4 /*yield*/, timer(2000)];
+                case 4:
+                    _a.sent();
+                    return [3 /*break*/, 3];
+                case 5:
                     UMR = new nodejs_wth_umr_connect_1.UMRConnect();
                     freeAtHome.setEnableLogging(true);
                     if (UMR_URL != "") {
@@ -174,7 +210,7 @@ function main() {
                         dictThermostats.get(thermostat).setIsCooling(state);
                     });
                     return [4 /*yield*/, UMR.Start()];
-                case 3:
+                case 6:
                     t = _a.sent();
                     console.log("Started");
                     return [2 /*return*/];
