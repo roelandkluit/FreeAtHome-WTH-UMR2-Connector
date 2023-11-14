@@ -65,7 +65,7 @@ addons.on("configurationChanged", function (configuration) {
 });
 //Creating thermostat using custom template, 
 //Pull request https://github.com/Busch-Jaeger/node-free-at-home/pull/4 is not going through, so lib does not have correct datapoints for RTC.
-//Implemented local version of the RTC
+//Implemented local version of the RTC to overcome incomplete implementation of the RTC in the API.
 function createRoomTemperatureControllerDeviceExt(FahConnection, nativeId, name) {
     return __awaiter(this, void 0, void 0, function () {
         var device, channel;
