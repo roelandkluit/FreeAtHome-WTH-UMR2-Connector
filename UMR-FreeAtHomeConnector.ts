@@ -129,7 +129,7 @@ async function main()
     if(REFRESH_INT != 0)
     {
         console.log("Using Configured Refresh interval: " + REFRESH_INT);
-        UMR.updateInterval = REFRESH_INT * 60;
+        UMR.updateInterval = REFRESH_INT * 60;        
     }
     else
     {
@@ -184,9 +184,12 @@ async function main()
       var t = await UMR.Start();
       console.log("Started");  
 }
-try {
+
+try
+{
     main();    
 }
-catch (error) {
-    console.error(error);
+catch (error)
+{ 
+  console.error(error);
 }
