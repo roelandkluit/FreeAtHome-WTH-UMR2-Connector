@@ -2,7 +2,7 @@
   "name": {
     "en": "WTH UMR2 Connector for Free@Home"
   },
-  "version": "0.0.5",
+  "version": "0.0.6",
   "id": "com.wthumr2",
   "license": "Lgplv3",
   "description": {
@@ -39,6 +39,10 @@
           "type": "number",
           "min": 1,
           "max": 30
+        },
+        "Config": {
+          "name": "Configuration",
+          "type": "string"
         }
       }
     }

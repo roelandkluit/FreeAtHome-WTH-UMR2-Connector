@@ -1,11 +1,13 @@
 {
-  "compilerOptions":
-  {
-    "target": "es5",
-    "module": "commonjs",
-    "outDir": "build",
-    "sourceMap": true,      
-    "esModuleInterop":true
-    //"strict": true
+  "extends": "@tsconfig/node18/tsconfig.json",
+  "compilerOptions": {
+    "declaration": true, /* Generates corresponding '.d.ts' file. */
+    "declarationMap": true, /* Generates a sourcemap for each corresponding '.d.ts' file. */
+    "downlevelIteration": true,
+    "sourceMap": true, /* Generates corresponding '.map' file. */
+    "outDir": "build", /* Redirect output structure to the directory. */
+    "rootDir": "", /* Specify the root directory of input files. Use to control the output directory structure with --outDir. */
+    "strict": true, /* Enable all strict type-checking options. */
+    "resolveJsonModule": true /* Include modules imported with '.json' extension */
   }
 }

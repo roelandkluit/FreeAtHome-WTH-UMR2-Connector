@@ -19,7 +19,7 @@ interface ChannelEvents {
 type ChannelEmitter = StrictEventEmitter<EventEmitter, ChannelEvents>;
 
 export class RoomTemperatureControllerChannelExt extends Mixin(Channel, (EventEmitter as { new(): ChannelEmitter })) {
-    private setPointTemperature: number = 22.0;
+    private setPointTemperature: number = 15.0;
     private HeatingOrCoolingMode: number = 0; //0 not active, 1 activeheat, 2 activecool
 
     constructor(channel: ApiVirtualChannel) {
@@ -79,6 +79,7 @@ export class RoomTemperatureControllerChannelExt extends Mixin(Channel, (EventEm
 
     public async start(initialSetTemperature?: number) {
         await this.setDatapoint(PairingIds.AL_MEASURED_TEMPERATURE, "0");
+
         if (typeof initialSetTemperature !== 'undefined') {
             this.setPointTemperature = initialSetTemperature;
 

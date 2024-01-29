@@ -6,10 +6,19 @@ import {RoomTemperatureControllerChannelExt} from "./RoomTemperatureControllerCh
 
 let dictThermostats = new Map<number, any>();
 var UMR_URL = "";
+var DEV_CONFIGS = "";
 var ECO_T = 0;
 var OFF_T = 0;
 var REFRESH_INT = 0;
-var timer = ms => new Promise( res => setTimeout(res, ms));
+var timer = (ms:any) => new Promise( (res:any) => setTimeout(res, ms));
+
+type RunConfig = {
+  thermostatID: number;
+  isOn: boolean; 
+  isEco: boolean;
+  setPoint: number;
+}
+var ThermostatRunConfig: Array<RunConfig> = [];
 
 export interface UMRConfigurationProperties extends API.Configuration {
     default: {
@@ -17,7 +26,8 @@ export interface UMRConfigurationProperties extends API.Configuration {
             UMR: string,
             TEMP_ECO: number,
             TEMP_OFF: number,
-            RefreshInt: number
+            RefreshInt: number,
+            Config: string
         }
     },
 };
@@ -42,6 +52,14 @@ addons.on("configurationChanged", (configuration: UMRConfigurationProperties) =>
   {
     REFRESH_INT = configuration.default.items.RefreshInt;
   }
+  if(configuration.default.items.Config != undefined)
+  {
+    DEV_CONFIGS = configuration.default.items.Config;
+  }
+  else
+  {
+    DEV_CONFIGS = "{}";
+  }
 });
 
 //Creating thermostat using custom template, 
@@ -59,6 +77,7 @@ async function CreateNewThermostat(thermostatID:number, InitialSetPoint:number, 
     var RTCChannel = await createRoomTemperatureControllerDeviceExt(FahConnection, "UMR_RT" + thermostatID, "UMR Thermostat " + thermostatID);
     RTCChannel.setAutoKeepAlive(true);
     RTCChannel.setAutoConfirm(true);
+    console.log("SetPoint: " + RTCChannel.getSetPointTemperature());
     RTCChannel.on('onSetPointTemperatureChanged', (value) => {
         console.log("Setpoint: " + thermostatID + "-->" + value );
         UMR.ThermostatNewSetpoint(thermostatID, value);        
@@ -80,7 +99,7 @@ async function CreateNewThermostat(thermostatID:number, InitialSetPoint:number, 
     });
     
     await RTCChannel.start();
-    dictThermostats.set(thermostatID, RTCChannel);
+    dict.set(thermostatID, RTCChannel);
     //console.log("Done Creating device" + number);
 }
 

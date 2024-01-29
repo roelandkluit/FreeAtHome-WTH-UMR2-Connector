@@ -1,6 +1,12 @@
 {
   "dependencies": {
-    "@busch-jaeger/free-at-home": "0.32.1",
+    "@busch-jaeger/free-at-home": "",
     "nodejs-wth-umr-connect": ""
+  },
+  "devDependencies": {
+    "@busch-jaeger/free-at-home-cli": "^0.9.1",
+    "@tsconfig/node18": "^18.2.2",
+    "@types/node": "^18.15.3",
+    "typescript": "^5.2.2"
   }
 }
