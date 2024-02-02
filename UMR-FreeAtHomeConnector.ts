@@ -3,20 +3,16 @@ import { ScriptingAPI as API } from "@busch-jaeger/free-at-home";
 import { ScriptingHost as Addons } from "@busch-jaeger/free-at-home";
 import { UMRConnect } from "nodejs-wth-umr-connect";
 import {RoomTemperatureControllerChannelExt} from "./RoomTemperatureControllerChannelExt";
+import { json } from "stream/consumers";
 
 let dictThermostats = new Map<number, any>();
-var UMR_URL = "";
-var DEV_CONFIGS = "";
-var ECO_T = 0;
-var OFF_T = 0;
-var REFRESH_INT = 0;
 var timer = (ms:any) => new Promise( (res:any) => setTimeout(res, ms));
 
 type RunConfig = {
-  thermostatID: number;
-  isOn: boolean; 
-  isEco: boolean;
-  setPoint: number;
+  tID: number;
+  bOn: boolean|undefined; 
+  bEco: boolean|undefined;
+  nT: number|undefined;
 }
 var ThermostatRunConfig: Array<RunConfig> = [];
 
@@ -34,33 +30,88 @@ export interface UMRConfigurationProperties extends API.Configuration {
 
 const metaData = Addons.readMetaData();
 const addons = new Addons.AddOn<UMRConfigurationProperties>(metaData.id);
+var cfgProp:UMRConfigurationProperties;
 
 addons.on("configurationChanged", (configuration: UMRConfigurationProperties) => {  
-  if(configuration.default.items.UMR != undefined)
+  
+  if(configuration.default.items.UMR == undefined)
   {
-    UMR_URL = configuration.default.items.UMR;
+    configuration.default.items.UMR = "umr_2";
   }
-  if(configuration.default.items.TEMP_ECO != undefined)
+  if(configuration.default.items.TEMP_ECO == undefined)
   {
-    ECO_T = configuration.default.items.TEMP_ECO;
+    configuration.default.items.TEMP_ECO = 16;
   }
-  if(configuration.default.items.TEMP_OFF != undefined)
+  if(configuration.default.items.TEMP_OFF == undefined)
   {   
-    OFF_T = configuration.default.items.TEMP_OFF;
+    configuration.default.items.TEMP_OFF = 8;
   }
-  if(configuration.default.items.RefreshInt != undefined)
+  if(configuration.default.items.RefreshInt == undefined)
   {
-    REFRESH_INT = configuration.default.items.RefreshInt;
+    configuration.default.items.RefreshInt = 1;
   }
-  if(configuration.default.items.Config != undefined)
+  if(configuration.default.items.Config == undefined)
   {
-    DEV_CONFIGS = configuration.default.items.Config;
+    configuration.default.items.Config = "";
   }
-  else
-  {
-    DEV_CONFIGS = "{}";
-  }
+  cfgProp = configuration;
 });
+
+function updateSysApStatusConfig()
+{
+  try
+  {
+    var b64data = JSON.stringify(ThermostatRunConfig);
+    if(cfgProp.default.items.Config != b64data)
+    {
+      cfgProp.default.items.Config = b64data;
+      addons.setConfiguration(cfgProp);
+    }
+  }catch(error)
+  {
+    console.log(`Unable to update config: ${error}`);
+  }
+
+}
+
+function getThermostatConfigByNumber(ThermostatNumber:number):RunConfig
+{
+  var oTsRunCfg:RunConfig|undefined;
+
+  try
+  {
+    ThermostatRunConfig = JSON.parse(cfgProp.default.items.Config);
+  }
+  catch(error)
+  {
+      console.log(`Unable to process STATUS json: ${error}`);
+  }
+
+  ThermostatRunConfig.forEach(tsRunCfg => 
+  {
+    if(tsRunCfg.tID == ThermostatNumber)
+    {
+      //console.log("FoundCfg: " + ThermostatNumber);
+      oTsRunCfg = tsRunCfg;
+      return oTsRunCfg;
+    }    
+  })
+
+  if(oTsRunCfg == undefined)
+  {
+    //console.log("CreateNewCfg: " + ThermostatNumber);
+    oTsRunCfg = {
+      tID: ThermostatNumber,
+      bOn: undefined,
+      bEco: undefined,
+      nT: undefined
+    };
+    ThermostatRunConfig.push(oTsRunCfg);
+    updateSysApStatusConfig();
+  }
+  
+  return oTsRunCfg;
+}
 
 //Creating thermostat using custom template, 
 //Pull request https://github.com/Busch-Jaeger/node-free-at-home/pull/4 is not going through, so lib does not have correct datapoints for RTC.
@@ -80,26 +131,74 @@ async function CreateNewThermostat(thermostatID:number, InitialSetPoint:number, 
     console.log("SetPoint: " + RTCChannel.getSetPointTemperature());
     RTCChannel.on('onSetPointTemperatureChanged', (value) => {
         console.log("Setpoint: " + thermostatID + "-->" + value );
+        getThermostatConfigByNumber(thermostatID).nT = value;
+        updateSysApStatusConfig();
         UMR.ThermostatNewSetpoint(thermostatID, value);        
     });
     RTCChannel.on('onDeviceEcoModeChanged', (value) => {
         console.log("EcoMode: " + thermostatID + "-->" + value );        
         if(value)
+        {
             UMR.SetEco(thermostatID);
+            getThermostatConfigByNumber(thermostatID).bEco = true;
+            updateSysApStatusConfig();    
+        }
         else
-            UMR.SetEcoEnds(thermostatID, RTCChannel.getSetPointTemperature());
+        {
+            var trc = getThermostatConfigByNumber(thermostatID);
+            if(trc.tID != undefined)
+            {
+              UMR.SetEcoEnds(thermostatID, trc.tID);
+            }
+            else
+            {
+              UMR.SetEcoEnds(thermostatID, RTCChannel.getSetPointTemperature());
+            }
+            trc.bEco = false;
+            updateSysApStatusConfig();
+        }
     });
 
     RTCChannel.on('onDeviceOnOffModeChanged', (value) => {
         console.log("DeviceIsOn: " + thermostatID + "-->" + value );
         if(value)
-            UMR.SetOn(thermostatID, RTCChannel.getSetPointTemperature());
+        {
+            var trc = getThermostatConfigByNumber(thermostatID);
+            if(trc.nT != undefined)
+            {
+              UMR.SetOn(thermostatID, trc.nT);
+            }
+            else
+            {
+              UMR.SetOn(thermostatID, RTCChannel.getSetPointTemperature());
+            }
+            trc.bOn = true;
+            updateSysApStatusConfig();
+        }
         else
+        {
+            getThermostatConfigByNumber(thermostatID).bOn = false;
+            updateSysApStatusConfig();  
             UMR.SetOff(thermostatID);
+        }
     });
     
     await RTCChannel.start();
     dict.set(thermostatID, RTCChannel);
+
+    var tsCfg = getThermostatConfigByNumber(thermostatID);
+    if(tsCfg.bEco != undefined && tsCfg.bEco)
+    {
+      UMR.SetEco(thermostatID);
+    }
+    else if(tsCfg.bOn != undefined && !tsCfg.bOn)    
+    {
+      UMR.SetOff(thermostatID);
+    }
+    else if(tsCfg.nT != undefined)
+    {
+      UMR.ThermostatNewSetpoint(thermostatID, tsCfg.nT);
+    }
     //console.log("Done Creating device" + number);
 }
 
@@ -130,25 +229,25 @@ async function main()
     var UMR = new UMRConnect();
     freeAtHome.setEnableLogging(true)
 
-    if(UMR_URL != "")
+    if(cfgProp.default.items.UMR != "")
     {
-        console.log("Using Configured UMR2 Hostname: " + UMR_URL);
-        UMR.SetHostname(UMR_URL);
+        console.log("Using Configured UMR2 Hostname: " + cfgProp.default.items.UMR);
+        UMR.SetHostname(cfgProp.default.items.UMR);
     }
-    if(ECO_T != 0)
+    if(cfgProp.default.items.TEMP_ECO != 0)
     {
-        console.log("Using Configured ECO Temp: " + ECO_T);
-        UMR.UMR_ECO_TEMPERATURE = ECO_T;
+        console.log("Using Configured ECO Temp: " + cfgProp.default.items.TEMP_ECO);
+        UMR.UMR_ECO_TEMPERATURE = cfgProp.default.items.TEMP_ECO;
     }
-    if(OFF_T != 0)
+    if(cfgProp.default.items.TEMP_OFF != 0)
     {
-        console.log("Using Configured OFF Temp: " + OFF_T);
-        UMR.UMR_OFF_TEMPERATURE = OFF_T;
+        console.log("Using Configured OFF Temp: " + cfgProp.default.items.TEMP_OFF);
+        UMR.UMR_OFF_TEMPERATURE = cfgProp.default.items.TEMP_OFF;
     }
-    if(REFRESH_INT != 0)
+    if(cfgProp.default.items.RefreshInt != 0)
     {
-        console.log("Using Configured Refresh interval: " + REFRESH_INT);
-        UMR.updateInterval = REFRESH_INT * 60;        
+        console.log("Using Configured Refresh interval: " + cfgProp.default.items.RefreshInt);
+        UMR.updateInterval = cfgProp.default.items.RefreshInt * 60;
     }
     else
     {
@@ -165,9 +264,9 @@ async function main()
     RTCChannel.sendMeasuredTemperature(18.5);
     */
 
-    UMR.on('onNewUMRDetected',(thermostat, InitialSetPoint) => {
+    UMR.on('onNewUMRDetected',(thermostat, InitialSetPoint) => {        
         console.log("NewDetect: " + thermostat );
-        CreateNewThermostat(thermostat, InitialSetPoint, dictThermostats, freeAtHome, UMR);        
+        CreateNewThermostat(thermostat, InitialSetPoint, dictThermostats, freeAtHome, UMR);
       });
     
       UMR.on("onUMREcoChanged", (thermostat, eco) => {
@@ -181,6 +280,8 @@ async function main()
       });
     
       UMR.on("onUMRSetPointChanged", (thermostat, setpoint) => {
+          getThermostatConfigByNumber(thermostat).nT = setpoint;
+          updateSysApStatusConfig();
           console.log("Setpoint: " + thermostat  + " " + setpoint);
           dictThermostats.get(thermostat).sendSetPointTemperature(setpoint);
       });
