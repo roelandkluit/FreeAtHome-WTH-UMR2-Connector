@@ -1,0 +1,4 @@
+For building
+
+use 'npm install' for building
+use 'npm install --omit=dev' use on build package
