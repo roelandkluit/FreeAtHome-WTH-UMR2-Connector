@@ -2,11 +2,11 @@
   "name": {
     "en": "WTH UMR2 Connector for Free@Home"
   },
-  "version": "0.0.9",
+  "version": "0.1.0",
   "id": "com.wthumr2",
   "license": "Lgplv3",
   "description": {
-    "en": "Control the thermostats of a WTH UMR2 trough Free@Home."
+    "en": "Control the BUS thermostats connected to a WTH UMR2 trough Free@Home."
   },
   "url": {
 	"en": "https://github.com/roelandkluit/"

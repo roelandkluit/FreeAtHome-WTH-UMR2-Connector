@@ -11,16 +11,18 @@ const events_1 = require("events");
 class RoomTemperatureControllerChannelExt extends (0, ts_mixer_1.Mixin)(free_at_home_2.Channel, events_1.EventEmitter) {
     setPointTemperature = 15.0;
     HeatingOrCoolingMode = 0; //0 not active, 1 activeheat, 2 activecool
-    constructor(channel) {
+    parentDevice;
+    constructor(channel, device) {
         super(channel);
         channel.on("inputDatapointChanged", this.dataPointChanged.bind(this));
         channel.on("parameterChanged", this.parameterChanged.bind(this));
+        this.parentDevice = device;
     }
     dataPointChanged(id, value) {
-        console.log("set datapoint:", free_at_home_1.PairingIds[id], value);
         switch (id) {
             case free_at_home_1.PairingIds.AL_RELATIVE_SET_POINT_REQUEST:
                 {
+                    console.log("[FaH] Set datapoint: AL_RELATIVE_SET_POINT_REQUEST, ", value);
                     const intValue = Number.parseFloat(value);
                     this.setPointTemperature += intValue;
                     if (this.isAutoConfirm)
@@ -30,6 +32,7 @@ class RoomTemperatureControllerChannelExt extends (0, ts_mixer_1.Mixin)(free_at_
                 break;
             case free_at_home_1.PairingIds.AL_INFO_ABSOLUTE_SET_POINT_REQUEST:
                 {
+                    console.log("[FaH] Set datapoint: AL_INFO_ABSOLUTE_SET_POINT_REQUEST, ", value);
                     const intValue = Number.parseFloat(value);
                     this.setPointTemperature = intValue;
                     if (this.isAutoConfirm)
@@ -39,18 +42,21 @@ class RoomTemperatureControllerChannelExt extends (0, ts_mixer_1.Mixin)(free_at_
                 break;
             case free_at_home_1.PairingIds.AL_ECO_ON_OFF:
                 {
-                    // this.setDatapoint(PairingIds.AL_ECO_ON_OFF, value);
                     if ("1" === value) {
+                        console.log("[FaH] Set datapoint: AL_ECO_ON_OFF, EcoMode On");
                         this.setDatapoint(free_at_home_1.PairingIds.AL_STATE_INDICATION, "68");
                     }
                     else {
                         if (this.HeatingOrCoolingMode === 0) {
+                            console.log("[FaH] Set datapoint: AL_ECO_ON_OFF, Off");
                             this.setDatapoint(free_at_home_1.PairingIds.AL_STATE_INDICATION, "65");
                         }
                         else if (this.HeatingOrCoolingMode === 1) {
+                            console.log("[FaH] Set datapoint: AL_ECO_ON_OFF, HeatingMode On");
                             this.setDatapoint(free_at_home_1.PairingIds.AL_STATE_INDICATION, "33");
                         }
                         else if (this.HeatingOrCoolingMode === 2) {
+                            console.log("[FaH] Set datapoint: AL_ECO_ON_OFF, CoolingMode On");
                             this.setDatapoint(free_at_home_1.PairingIds.AL_STATE_INDICATION, "1");
                         }
                     }
@@ -59,17 +65,23 @@ class RoomTemperatureControllerChannelExt extends (0, ts_mixer_1.Mixin)(free_at_
                 break;
             case free_at_home_1.PairingIds.AL_CONTROLLER_ON_OFF_REQUEST:
                 {
+                    console.log("[FaH] Set datapoint: AL_CONTROLLER_ON_OFF_REQUEST, ", value);
                     this.setDatapoint(free_at_home_1.PairingIds.AL_CONTROLLER_ON_OFF, value);
                     this.emit("onDeviceOnOffModeChanged", "1" === value);
                 }
                 break;
+            default:
+                console.log("[FaH] Unknown datapoint changed:", free_at_home_1.ParameterIds[id], value);
+                break;
         }
     }
     parameterChanged(id, value) {
+        console.log("[FaH] Parameter changed:", free_at_home_1.ParameterIds[id], value);
     }
     async start(initialSetTemperature) {
         await this.setDatapoint(free_at_home_1.PairingIds.AL_MEASURED_TEMPERATURE, "0");
         if (typeof initialSetTemperature !== 'undefined') {
+            console.log("[FaH] Initial Set Temperature: ", initialSetTemperature);
             this.setPointTemperature = initialSetTemperature;
             await this.setDatapoint(free_at_home_1.PairingIds.AL_SET_POINT_TEMPERATURE, this.setPointTemperature.toFixed(1));
         }

@@ -361,3 +361,6 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+
+# Exclude VS Code launch configuration, contains SysAp specific settings
+.vscode/launch.json
