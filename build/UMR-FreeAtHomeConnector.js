@@ -6,7 +6,6 @@ const umrconnector_1 = require("nodejs-wth-umr-connect/umrconnector");
 const RoomTemperatureControllerChannelExt_1 = require("./RoomTemperatureControllerChannelExt");
 const freeAtHomeApi_1 = require("@busch-jaeger/free-at-home/lib/freeAtHomeApi");
 let dictThermostatMapping = new Map();
-//let dictThermostatNames = new Map<number, string>();
 var timer = (ms) => new Promise((res) => setTimeout(res, ms));
 var ThermostatRunConfig = [];
 ;
@@ -29,225 +28,160 @@ addons.on("configurationChanged", (configuration) => {
     if (configuration.default.items.Config == undefined) {
         configuration.default.items.Config = "";
     }
+    if (configuration.default.items.LogHTTPurl == undefined) {
+        configuration.default.items.LogHTTPurl = "";
+    }
     cfgProp = configuration;
 });
-function updateSysApStatusConfig() {
+/// Logs message to console and optionally to HTTP endpoint
+function LogToMessage(message, bIsError = false) {
+    if (bIsError)
+        console.error(message);
+    else
+        console.log(message);
     try {
-        var b64data = JSON.stringify(ThermostatRunConfig);
-        if (cfgProp.default.items.Config != b64data) {
-            cfgProp.default.items.Config = b64data;
-            addons.setConfiguration(cfgProp);
+        // Send to HTTP endpoint if configured
+        if (cfgProp == undefined || cfgProp.default == undefined || cfgProp.default.items.LogHTTPurl == "" || cfgProp.default.items.LogHTTPurl == undefined) {
+            return;
         }
+        // Encode message for URL
+        var encoded = encodeURIComponent(message);
+        //console.log(`Logging to HTTP: ${cfgProp.default.items.LogHTTPurl}?dev=FahUMR&msg=${encoded}&Error=${bIsError?"1":"0"}`);
+        // Send HTTP GET request
+        fetch(`${cfgProp.default.items.LogHTTPurl}?dev=FahUMR&msg=${encoded}&Error=${bIsError ? "1" : "0"}`)
+            .then(res => res.text())
+            .then(data => {
+            //console.log("Response:", data); 
+        });
     }
     catch (error) {
-        console.log(`Unable to update config: ${error}`);
+        console.error("Logging Error:", error);
     }
 }
-function getThermostatConfigByNumber(ThermostatNumber) {
-    var oTsRunCfg;
-    try {
-        ThermostatRunConfig = JSON.parse(cfgProp.default.items.Config);
-    }
-    catch (error) {
-        console.log(`Unable to process STATUS json: ${error}`);
-    }
-    ThermostatRunConfig.forEach(tsRunCfg => {
-        if (tsRunCfg.tID == ThermostatNumber) {
-            //console.log("FoundCfg: " + ThermostatNumber);
-            oTsRunCfg = tsRunCfg;
-            return oTsRunCfg;
-        }
-    });
-    if (oTsRunCfg == undefined) {
-        //console.log("CreateNewCfg: " + ThermostatNumber);
-        oTsRunCfg = {
-            tID: ThermostatNumber,
-            bOn: undefined,
-            bEco: undefined,
-            nT: undefined
-        };
-        ThermostatRunConfig.push(oTsRunCfg);
-        updateSysApStatusConfig();
-    }
-    return oTsRunCfg;
-}
-//Creating thermostat using custom template, 
-//Pull request https://github.com/Busch-Jaeger/node-free-at-home/pull/4 is not going through, so lib does not have correct datapoints for RTC.
-//Implemented local version of the RTC to overcome incomplete implementation of the RTC in the API.
-async function createRoomTemperatureControllerDeviceExt(FahConnection, nativeId, name) {
-    const device = await FahConnection.freeAtHomeApi.createDevice("RTC", nativeId, name);
-    const channel = device.getChannels().next().value;
-    return new RoomTemperatureControllerChannelExt_1.RoomTemperatureControllerChannelExt(channel, device);
-}
-async function CreateNewThermostat(thermostatID, InitialSetPoint, dict, FahConnection, UMR) {
-    console.log("[SysAp] Creating device: ", thermostatID);
-    var RTCChannel = await createRoomTemperatureControllerDeviceExt(FahConnection, "UMR_RT" + thermostatID, "UMR Thermostat " + thermostatID);
+async function CreateNewThermostat(thermostatID, dict, FahConnection, UMR) {
+    LogToMessage(`[SysAp] Creating device: ${thermostatID}`, false);
+    var RTCChannel = await RoomTemperatureControllerChannelExt_1.RoomTemperatureControllerChannelExt.CreateRoomTemperatureControllerDeviceExt(FahConnection, "UMR_RT" + thermostatID, "UMR Thermostat " + thermostatID);
     RTCChannel.setAutoKeepAlive(true);
     RTCChannel.setAutoConfirm(true);
-    try {
-        var dev = await FahConnection.getDevice(RTCChannel.parentDevice.serialNumber);
-        if (dev != undefined && dev.channels != null) {
-            var channel = Object.values(dev.channels)[0];
-            var displayname = channel.displayName;
-            if (displayname != undefined) {
-                console.log("[SysAp] Device Display Name: ", displayname);
-                //dictThermostatNames.set(thermostatID, displayname);
-            }
-            else {
-                //dictThermostatNames.set(thermostatID, "UMR Thermostat " + thermostatID);
-            }
-        }
-    }
-    catch (error) {
-        console.log("[SysAp] Unable to get Device Display Name: ", error);
-        //dictThermostatNames.set(thermostatID, "UMR Thermostat " + thermostatID);
-    }
-    console.log("[FAH>UMR] Initial SetPoint: " + RTCChannel.getSetPointTemperature());
     RTCChannel.on('onSetPointTemperatureChanged', (value) => {
-        console.log("[FAH>UMR] Setpoint: " + thermostatID + "-->" + value);
-        getThermostatConfigByNumber(thermostatID).nT = value;
-        updateSysApStatusConfig();
+        LogToMessage(`[FAH>UMR] Setpoint: ${thermostatID}-->${value}`, false);
         UMR.ThermostatNewSetpoint(thermostatID, value);
     });
     RTCChannel.on('onDeviceEcoModeChanged', (value) => {
-        console.log("[FAH>UMR] EcoMode: " + thermostatID + "-->" + value);
+        LogToMessage(`[FAH>UMR] EcoMode: ${thermostatID}-->${value}`, false);
         if (value) {
             UMR.SetEco(thermostatID);
-            getThermostatConfigByNumber(thermostatID).bEco = true;
-            updateSysApStatusConfig();
         }
         else {
-            var trc = getThermostatConfigByNumber(thermostatID);
-            if (trc.tID != undefined) {
-                UMR.SetEcoEnds(thermostatID, trc.tID);
-            }
-            else {
-                UMR.SetEcoEnds(thermostatID, RTCChannel.getSetPointTemperature());
-            }
-            trc.bEco = false;
-            updateSysApStatusConfig();
+            console.log("Restore Setpoint on Eco End: " + thermostatID + " to " + RTCChannel.getSetPointTemperature());
+            UMR.SetEcoEnds(thermostatID, RTCChannel.getSetPointTemperature());
         }
     });
     RTCChannel.on('onDeviceOnOffModeChanged', (value) => {
-        console.log("[FAH>UMR] DeviceIsOn: " + thermostatID + "-->" + value);
+        LogToMessage(`[FAH>UMR] DeviceIsOn: ${thermostatID}-->${value}`, false);
         if (value) {
-            var trc = getThermostatConfigByNumber(thermostatID);
-            if (trc.nT != undefined) {
-                UMR.SetOn(thermostatID, trc.nT);
-            }
-            else {
-                UMR.SetOn(thermostatID, RTCChannel.getSetPointTemperature());
-            }
-            trc.bOn = true;
-            updateSysApStatusConfig();
+            UMR.SetOn(thermostatID, RTCChannel.getSetPointTemperature());
         }
         else {
-            getThermostatConfigByNumber(thermostatID).bOn = false;
-            updateSysApStatusConfig();
             UMR.SetOff(thermostatID);
         }
     });
     await RTCChannel.start();
     dict.set(thermostatID, RTCChannel);
-    var tsCfg = getThermostatConfigByNumber(thermostatID);
-    if (tsCfg.bEco != undefined && tsCfg.bEco) {
-        UMR.SetEco(thermostatID);
+    if (RTCChannel.HasValidFaHValues()) {
+        LogToMessage(`[SysAp] Valid FaH values for Thermostat ${thermostatID}, restoring previous state: EcoMode: ${RTCChannel.GetEcoMode()}, OnMode: ${RTCChannel.GetOnMode()}, Setpoint: ${RTCChannel.getSetPointTemperature()}`, false);
+        if (RTCChannel.GetEcoMode()) {
+            UMR.SetEco(thermostatID);
+        }
+        else if (RTCChannel.GetOnMode() == false) {
+            UMR.SetOff(thermostatID);
+        }
+        else {
+            UMR.SetOn(thermostatID, RTCChannel.getSetPointTemperature());
+        }
     }
-    else if (tsCfg.bOn != undefined && !tsCfg.bOn) {
-        UMR.SetOff(thermostatID);
+    else {
+        LogToMessage(`[SysAp] No valid FaH values for Thermostat ${thermostatID}, skipping restoring previous state`, false);
     }
-    else if (tsCfg.nT != undefined) {
-        UMR.ThermostatNewSetpoint(thermostatID, tsCfg.nT);
-    }
-    console.log("[SysAp] Created device:", thermostatID);
+    LogToMessage(`[SysAp] Created device: ${thermostatID}`, false);
 }
 async function main() {
-    console.log("[SysAp] UMR FAH Connector Starting");
+    console.log("Starting Free@Home UMR2 Connector Addon");
     var freeAtHome = new free_at_home_1.FreeAtHome();
     freeAtHome.activateSignalHandling();
     await addons.connectToConfiguration();
-    await timer(2000);
-    console.log("[SysAp] FAH UMR Connector Initialization completed");
+    await timer(5000);
+    LogToMessage("[SysAp] FAH UMR Connector Initialization started", false);
     var count = 0;
     while (freeAtHome.freeAtHomeApi.getConnectionState() != freeAtHomeApi_1.ConnectionStates.open) {
         count++;
-        console.log("[FAH] Not connected: " + freeAtHome.freeAtHomeApi.getConnectionState());
+        LogToMessage(`[FAH] Not connected: ${freeAtHomeApi_1.ConnectionStates[freeAtHome.freeAtHomeApi.getConnectionState()]}`, true);
         if (count > 10) {
-            console.error("[FAH] Failing on connection to SysAp");
+            LogToMessage("[FAH] Failing on connection to SysAp", true);
             process.exit();
             return;
         }
-        await timer(2000);
+        await timer(5000);
     }
     var SysApName = (await freeAtHome.freeAtHomeApi.getSysapSection()).sysapName;
-    console.log(`[FAH] Connected to SysAp "${SysApName}"`);
+    LogToMessage(`[FAH] Connected to SysAp "${SysApName}"`, false);
     var UMR = new umrconnector_1.UMRConnect();
     freeAtHome.setEnableLogging(true);
     if (cfgProp.default.items.UMR != "") {
-        console.log("[SysAp] Using Configured UMR2 Hostname: " + cfgProp.default.items.UMR);
+        LogToMessage(`[SysAp] Using Configured UMR2 Hostname: ${cfgProp.default.items.UMR}`, false);
         UMR.SetHostname(cfgProp.default.items.UMR);
     }
     if (cfgProp.default.items.TEMP_ECO != 0) {
-        console.log("[SysAp] Using Configured ECO Temp: " + cfgProp.default.items.TEMP_ECO);
+        LogToMessage(`[SysAp] Using Configured ECO Temp: ${cfgProp.default.items.TEMP_ECO}`, false);
         UMR.UMR_ECO_TEMPERATURE = cfgProp.default.items.TEMP_ECO;
     }
     if (cfgProp.default.items.TEMP_OFF != 0) {
-        console.log("[SysAp] Using Configured OFF Temp: " + cfgProp.default.items.TEMP_OFF);
+        LogToMessage(`[SysAp] Using Configured OFF Temp: ${cfgProp.default.items.TEMP_OFF}`, false);
         UMR.UMR_OFF_TEMPERATURE = cfgProp.default.items.TEMP_OFF;
     }
-    if (cfgProp.default.items.RefreshInt != 0) {
-        console.log("[SysAp] Using Configured Refresh interval: " + cfgProp.default.items.RefreshInt);
+    if (cfgProp.default.items.RefreshInt != 0 && cfgProp.default.items.RefreshInt >= 1) {
+        LogToMessage(`[SysAp] Using Configured Refresh interval: ${cfgProp.default.items.RefreshInt}`, false);
         UMR.updateInterval = cfgProp.default.items.RefreshInt * 60;
     }
     else {
         UMR.updateInterval = 60;
     }
     UMR.newDeviceNotificatonInterval = 5;
-    /*const RTCChannel = await freeAtHome.createRoomTemperatureControllerDevice("UMR_RT4", "UMR Thermostat");
-    RTCChannel.setAutoKeepAlive(true);
-    RTCChannel.on('onSetPointTemperatureChanged', (value) => {
-        console.log("Setpoint: " + value );
-    });
-    RTCChannel.start(8);
-    RTCChannel.sendMeasuredTemperature(18.5);
-    */
     UMR.on('onNewUMRDetected', (thermostat, InitialSetPoint) => {
-        console.log(`[UMR>FAH] Thermostat ${thermostat} Detected, creating FaH instance, using intial setpoint: ${InitialSetPoint}`);
-        CreateNewThermostat(thermostat, InitialSetPoint, dictThermostatMapping, freeAtHome, UMR);
+        LogToMessage(`[UMR>FAH] Thermostat ${thermostat} Detected, creating FaH instance`, false);
+        CreateNewThermostat(thermostat, dictThermostatMapping, freeAtHome, UMR);
     });
     UMR.on("onUMREcoChanged", (thermostat, eco) => {
-        console.log("[UMR>FAH] IsEco: " + thermostat + " " + eco);
+        LogToMessage(`[UMR>FAH] IsEco: ${thermostat} ${eco}`, false);
         dictThermostatMapping.get(thermostat)?.setEcoState(eco);
     });
     UMR.on("onUMROnOffChanged", (thermostat, ison) => {
-        console.log("[UMR>FAH] IsOn: " + thermostat + " " + ison);
+        LogToMessage(`[UMR>FAH] IsOn: ${thermostat} ${ison}`, false);
         dictThermostatMapping.get(thermostat)?.setOnState(ison);
     });
     UMR.on("onUMRSetPointChanged", (thermostat, setpoint) => {
-        getThermostatConfigByNumber(thermostat).nT = setpoint;
-        updateSysApStatusConfig();
-        console.log("[UMR>FAH] Setpoint: " + thermostat + " " + setpoint);
+        LogToMessage(`[UMR>FAH] Setpoint: ${thermostat} ${setpoint}`, false);
         dictThermostatMapping.get(thermostat)?.sendSetPointTemperature(setpoint);
     });
     UMR.on("onUMRMessuredTemperatureChanged", (thermostat, temperature) => {
-        console.log("[UMR>FAH] Temperature: " + thermostat + " " + temperature);
+        LogToMessage(`[UMR>FAH] Temperature: ${thermostat} ${temperature}`, false);
         dictThermostatMapping.get(thermostat)?.sendMeasuredTemperature(temperature);
     });
     UMR.on("onUMRHeatIsActiveChanged", (thermostat, state) => {
-        console.log("[UMR>FAH] HeatingActive: " + thermostat + " " + state);
+        LogToMessage(`[UMR>FAH] HeatingActive: ${thermostat} ${state}`, false);
         dictThermostatMapping.get(thermostat)?.setIsHeating(state);
     });
     UMR.on("onUMRCoolingIsActiveChanged", (thermostat, state) => {
-        console.log("[UMR>FAH] CoolingActive: " + thermostat + " " + state);
+        LogToMessage(`[UMR>FAH] CoolingActive: ${thermostat} ${state}`, false);
         dictThermostatMapping.get(thermostat)?.setIsCooling(state);
     });
     var t = await UMR.Start();
-    console.log("UMR Device Instance Started");
+    LogToMessage("UMR Device Instance Started", false);
 }
 try {
     main();
 }
 catch (error) {
-    console.error(error);
+    LogToMessage(`[SysAp] Fatal Error: ${error}`, true);
 }
 //# sourceMappingURL=UMR-FreeAtHomeConnector.js.map

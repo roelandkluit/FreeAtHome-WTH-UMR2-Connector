@@ -1,4 +1,4 @@
-import { PairingIds, ParameterIds } from "@busch-jaeger/free-at-home";
+import { FreeAtHome, PairingIds, ParameterIds } from "@busch-jaeger/free-at-home";
 import { ApiVirtualChannel } from "@busch-jaeger/free-at-home";
 import { ApiVirtualDevice } from "@busch-jaeger/free-at-home/lib/api/apiVirtualDevice";
 import { Channel } from "@busch-jaeger/free-at-home";
@@ -14,8 +14,18 @@ declare const RoomTemperatureControllerChannelExt_base: import("ts-mixer/dist/ty
 export declare class RoomTemperatureControllerChannelExt extends RoomTemperatureControllerChannelExt_base {
     private setPointTemperature;
     private HeatingOrCoolingMode;
-    parentDevice: ApiVirtualDevice;
+    private isEcoMode;
+    private isON;
+    private DeviceDisplayName;
+    private validFahValuesRecieved;
     constructor(channel: ApiVirtualChannel, device: ApiVirtualDevice);
+    private updateSetPointTemperature;
+    GetEcoMode(): boolean;
+    GetOnMode(): boolean;
+    HasValidFaHValues(): boolean;
+    static CreateRoomTemperatureControllerDeviceExt(FahConnection: FreeAtHome, nativeId: string, name: string): Promise<RoomTemperatureControllerChannelExt>;
+    private ProcessChannelOutputs;
+    private ProcessChannelInputs;
     protected dataPointChanged(id: PairingIds, value: string): void;
     protected parameterChanged(id: ParameterIds, value: string): void;
     start(initialSetTemperature?: number): Promise<void>;

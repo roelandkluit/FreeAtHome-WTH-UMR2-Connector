@@ -1,7 +1,7 @@
 {
   "dependencies": {
     "@busch-jaeger/free-at-home": "",
-    "nodejs-wth-umr-connect": "^0.0.8"
+    "nodejs-wth-umr-connect": ">=0.1.0"
   },
   "devDependencies": {
     "@busch-jaeger/free-at-home-cli": "^0.9.1",

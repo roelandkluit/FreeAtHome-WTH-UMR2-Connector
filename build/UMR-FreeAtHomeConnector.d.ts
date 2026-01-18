@@ -6,6 +6,7 @@ export interface UMRConfigurationProperties extends API.Configuration {
             TEMP_ECO: number;
             TEMP_OFF: number;
             RefreshInt: number;
+            LogHTTPurl: string;
             Config: string;
         };
     };
