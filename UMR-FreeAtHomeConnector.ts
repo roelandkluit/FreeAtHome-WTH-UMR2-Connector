@@ -238,14 +238,24 @@ async function main()
     
       UMR.on("onUMRSetPointChanged", (thermostat, setpoint) =>
       {
+          if(setpoint < 5 || setpoint > 30 || Number.isNaN(setpoint))
+          {
+            LogToMessage(`[UMR>FAH] Warning: Setpoint out of range: ${thermostat} ${setpoint}`, true);           
+            return;
+          }
           LogToMessage(`[UMR>FAH] Setpoint: ${thermostat} ${setpoint}`, false);
           dictThermostatMapping.get(thermostat)?.sendSetPointTemperature(setpoint);
       });
     
       UMR.on("onUMRMessuredTemperatureChanged", (thermostat, temperature) =>
       {
-        LogToMessage(`[UMR>FAH] Temperature: ${thermostat} ${temperature}`, false);
-        dictThermostatMapping.get(thermostat)?.sendMeasuredTemperature(temperature);
+          if(temperature < -5 || temperature > 40 || Number.isNaN(temperature))
+          {
+            LogToMessage(`[UMR>FAH] Warning: Temperature out of range: ${thermostat} ${temperature}`, true);           
+            return;
+          }
+          LogToMessage(`[UMR>FAH] Temperature: ${thermostat} ${temperature}`, false);
+          dictThermostatMapping.get(thermostat)?.sendMeasuredTemperature(temperature);
       });    
 
       UMR.on("onUMRHeatIsActiveChanged", (thermostat, state) =>
