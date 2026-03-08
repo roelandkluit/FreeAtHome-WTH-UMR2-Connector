@@ -7,7 +7,6 @@ const RoomTemperatureControllerChannelExt_1 = require("./RoomTemperatureControll
 const freeAtHomeApi_1 = require("@busch-jaeger/free-at-home/lib/freeAtHomeApi");
 let dictThermostatMapping = new Map();
 var timer = (ms) => new Promise((res) => setTimeout(res, ms));
-var ThermostatRunConfig = [];
 ;
 const metaData = free_at_home_2.ScriptingHost.readMetaData();
 const addons = new free_at_home_2.ScriptingHost.AddOn(metaData.id);
@@ -58,7 +57,7 @@ function LogToMessage(message, bIsError = false) {
         console.error("Logging Error:", error);
     }
 }
-async function CreateNewThermostat(thermostatID, dict, FahConnection, UMR) {
+async function CreateNewThermostat(thermostatID, dict, FahConnection, UMR, InitialSetPoint) {
     LogToMessage(`[SysAp] Creating device: ${thermostatID}`, false);
     var RTCChannel = await RoomTemperatureControllerChannelExt_1.RoomTemperatureControllerChannelExt.CreateRoomTemperatureControllerDeviceExt(FahConnection, "UMR_RT" + thermostatID, "UMR Thermostat " + thermostatID);
     RTCChannel.setAutoKeepAlive(true);
@@ -66,6 +65,28 @@ async function CreateNewThermostat(thermostatID, dict, FahConnection, UMR) {
     RTCChannel.on('onSetPointTemperatureChanged', (value) => {
         LogToMessage(`[FAH>UMR] Setpoint: ${thermostatID}-->${value}`, false);
         UMR.ThermostatNewSetpoint(thermostatID, value);
+    });
+    RTCChannel.on('onDeviceInvalidFaHValuesReceived', async () => {
+        LogToMessage(`[FAH>UMR] Warning: Invalid FaH values received for Thermostat ${thermostatID}, using UMR data for update`, true);
+        RTCChannel.setIsCooling(false);
+        RTCChannel.setIsHeating(false);
+        if (InitialSetPoint == cfgProp.default.items.TEMP_ECO) {
+            LogToMessage(`[UMR>FAH] Initial Setpoint is ECO Temp, setting Eco Mode for Thermostat ${thermostatID}`, false);
+            RTCChannel.sendSetPointTemperature(18);
+            await timer(500);
+            RTCChannel.setEcoState(true);
+        }
+        if (InitialSetPoint == cfgProp.default.items.TEMP_OFF) {
+            LogToMessage(`[UMR>FAH] Initial Setpoint is OFF Temp, setting Off Mode for Thermostat ${thermostatID}`, false);
+            RTCChannel.sendSetPointTemperature(18);
+            await timer(500);
+            RTCChannel.setOnState(false);
+        }
+        else {
+            LogToMessage(`[UMR>FAH] Setting initial Setpoint for Thermostat ${thermostatID} to ${InitialSetPoint}`, false);
+            RTCChannel.setOnState(true);
+            RTCChannel.sendSetPointTemperature(InitialSetPoint);
+        }
     });
     RTCChannel.on('onDeviceEcoModeChanged', (value) => {
         LogToMessage(`[FAH>UMR] EcoMode: ${thermostatID}-->${value}`, false);
@@ -149,7 +170,7 @@ async function main() {
     UMR.newDeviceNotificatonInterval = 5;
     UMR.on('onNewUMRDetected', (thermostat, InitialSetPoint) => {
         LogToMessage(`[UMR>FAH] Thermostat ${thermostat} Detected, creating FaH instance`, false);
-        CreateNewThermostat(thermostat, dictThermostatMapping, freeAtHome, UMR);
+        CreateNewThermostat(thermostat, dictThermostatMapping, freeAtHome, UMR, InitialSetPoint);
     });
     UMR.on("onUMREcoChanged", (thermostat, eco) => {
         LogToMessage(`[UMR>FAH] IsEco: ${thermostat} ${eco}`, false);

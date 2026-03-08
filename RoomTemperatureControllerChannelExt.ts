@@ -16,6 +16,7 @@ interface ChannelEvents {
     onSetPointTemperatureChanged(value: number): void;
     onDeviceEcoModeChanged(valueIsEco: boolean): void;
     onDeviceOnOffModeChanged(valueIsOn: boolean): void;
+    onDeviceInvalidFaHValuesReceived(): void;
 }
 
 type ChannelEmitter = StrictEventEmitter<EventEmitter, ChannelEvents>;
@@ -102,8 +103,9 @@ export class RoomTemperatureControllerChannelExt extends Mixin(Channel, (EventEm
                         console.log(`[FAH] Initial FaH Set Point Temperature: ${this.setPointTemperature}`);
                     }
                     else
-                        {
-                        console.log(`[FAH] Initial FaH Set Point Temperature: No change in temperature or out of bounds: ${tempValue}.`);
+                    {
+                        console.log(`[FAH] Initial FaH Set Point Temperature: No change in temperature or out of bounds: ${tempValue}.`);                        
+                        this.emit("onDeviceInvalidFaHValuesReceived");
                     }
                 }                
             }            

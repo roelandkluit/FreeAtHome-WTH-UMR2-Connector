@@ -67,6 +67,7 @@ class RoomTemperatureControllerChannelExt extends (0, ts_mixer_1.Mixin)(free_at_
                     }
                     else {
                         console.log(`[FAH] Initial FaH Set Point Temperature: No change in temperature or out of bounds: ${tempValue}.`);
+                        this.emit("onDeviceInvalidFaHValuesReceived");
                     }
                 }
             }
