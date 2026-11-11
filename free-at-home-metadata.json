@@ -2,7 +2,7 @@
   "name": {
     "en": "WTH UMR2 Connector for Free@Home"
   },
-  "version": "0.1.1",
+  "version": "0.1.3",
   "id": "com.wthumr2",
   "license": "Lgplv3",
   "description": {
@@ -39,14 +39,6 @@
           "type": "number",
           "min": 1,
           "max": 30
-        },
-        "Config": {
-          "name": "Configuration",
-          "type": "string"
-        },
-        "LogHTTPurl": {
-          "name": "(Optional) HTTP Log Server URL",
-          "type": "string"
         }
       }
     }

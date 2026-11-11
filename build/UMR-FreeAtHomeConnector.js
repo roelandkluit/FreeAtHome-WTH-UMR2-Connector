@@ -24,12 +24,6 @@ addons.on("configurationChanged", (configuration) => {
     if (configuration.default.items.RefreshInt == undefined) {
         configuration.default.items.RefreshInt = 1;
     }
-    if (configuration.default.items.Config == undefined) {
-        configuration.default.items.Config = "";
-    }
-    if (configuration.default.items.LogHTTPurl == undefined) {
-        configuration.default.items.LogHTTPurl = "";
-    }
     cfgProp = configuration;
 });
 /// Logs message to console and optionally to HTTP endpoint
@@ -38,24 +32,6 @@ function LogToMessage(message, bIsError = false) {
         console.error(message);
     else
         console.log(message);
-    try {
-        // Send to HTTP endpoint if configured
-        if (cfgProp == undefined || cfgProp.default == undefined || cfgProp.default.items.LogHTTPurl == "" || cfgProp.default.items.LogHTTPurl == undefined) {
-            return;
-        }
-        // Encode message for URL
-        var encoded = encodeURIComponent(message);
-        //console.log(`Logging to HTTP: ${cfgProp.default.items.LogHTTPurl}?dev=FahUMR&msg=${encoded}&Error=${bIsError?"1":"0"}`);
-        // Send HTTP GET request
-        fetch(`${cfgProp.default.items.LogHTTPurl}?dev=FahUMR&msg=${encoded}&Error=${bIsError ? "1" : "0"}`)
-            .then(res => res.text())
-            .then(data => {
-            //console.log("Response:", data); 
-        });
-    }
-    catch (error) {
-        console.error("Logging Error:", error);
-    }
 }
 async function CreateNewThermostat(thermostatID, dict, FahConnection, UMR, InitialSetPoint) {
     LogToMessage(`[SysAp] Creating device: ${thermostatID}`, false);

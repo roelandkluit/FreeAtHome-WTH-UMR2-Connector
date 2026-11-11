@@ -17,9 +17,7 @@ export interface UMRConfigurationProperties extends API.Configuration {
             UMR: string,
             TEMP_ECO: number,
             TEMP_OFF: number,
-            RefreshInt: number,
-            LogHTTPurl: string,
-            Config: string
+            RefreshInt: number
         }
     },
 };
@@ -46,14 +44,6 @@ addons.on("configurationChanged", (configuration: UMRConfigurationProperties) =>
   {
     configuration.default.items.RefreshInt = 1;
   }
-  if(configuration.default.items.Config == undefined)
-  {
-    configuration.default.items.Config = "";
-  }
-  if(configuration.default.items.LogHTTPurl == undefined)
-  {
-    configuration.default.items.LogHTTPurl = "";
-  }
 
   cfgProp = configuration;
 });
@@ -65,29 +55,6 @@ function LogToMessage(message:string, bIsError:boolean = false)
     console.error(message);
   else
     console.log(message);
-
-  try
-  {
-    // Send to HTTP endpoint if configured
-    if(cfgProp == undefined || cfgProp.default == undefined || cfgProp.default.items.LogHTTPurl == "" || cfgProp.default.items.LogHTTPurl == undefined)
-    {  
-      return;
-    }
-    // Encode message for URL
-    var encoded = encodeURIComponent(message);
-    //console.log(`Logging to HTTP: ${cfgProp.default.items.LogHTTPurl}?dev=FahUMR&msg=${encoded}&Error=${bIsError?"1":"0"}`);
-    // Send HTTP GET request
-    fetch(`${cfgProp.default.items.LogHTTPurl}?dev=FahUMR&msg=${encoded}&Error=${bIsError?"1":"0"}`)
-    .then(res => res.text())
-    .then(data =>
-      {
-      //console.log("Response:", data); 
-      });
-  }
-  catch(error)
-  {
-    console.error("Logging Error:", error);
-  }
 }
 
 async function CreateNewThermostat(thermostatID:number, dict:any, FahConnection:FreeAtHome, UMR:UMRConnect, InitialSetPoint:number)
